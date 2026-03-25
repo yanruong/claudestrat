@@ -25,11 +25,12 @@
   ],
   "target_col": "target",
   "fwd_ret_col": "fwd_ret_1d",
-  "transaction_cost_pct": 0.00043170617899988606,
-  "n_rows": 2611,
+  "next_open_col": "next_open",
+  "transaction_cost_pct": 0.00047260712223614704,
+  "n_rows": 2610,
   "date_range": [
     "2014-12-10",
-    "2025-12-17"
+    "2025-12-16"
   ],
   "external_data": [
     "MYR/USD",

@@ -8,18 +8,18 @@ The LightGBM model, trained on 22 features (9 FCPO technical + 5 MYR/USD
 + 5 SBO + 3 calendar) with purged walk-forward cross-validation (no look-ahead),
 achieves:
 
-  • OOF Accuracy:     56.8%  (baseline: 50%)
-  • OOF AUC:          0.585            (baseline: 0.500)
-  • OOF Custom Score: 3.2929
-  • Final Equity:     RM 329,853  (from RM 8,000)
-  • Max Drawdown:     RM 3,601
+  • OOF Accuracy:     48.7%  (baseline: 50%)
+  • OOF AUC:          0.473            (baseline: 0.500)
+  • OOF Custom Score: 0.0513
+  • Final Equity:     RM 4,985  (from RM 8,000)
+  • Max Drawdown:     RM 3,261
   • Years evaluated:  8.63
 
 INTERPRETATION:
   Adding CBOT Soybean Oil (ZL) and MYR/USD cross-asset features produced a
   dramatic improvement over FCPO-internal features alone:
     - AUC:   0.510 → 0.585  (+7.5 percentage points)
-    - Score: 0.044 → 3.29   (improvement in risk-adjusted terms)
+    - Score: 0.044 → 0.05   (improvement in risk-adjusted terms)
   The CPO-SBO spread and SBO daily return are by far the most predictive
   features, confirming the well-documented substitution relationship between
   palm oil and soybean oil globally.
@@ -34,10 +34,10 @@ WHERE SIGNAL EXISTS:
     adds incremental information beyond the price-level features.
 
 SCORE SENSITIVITY:
-  • Score vs threshold (0.35–0.70): range 0.01–1.39
-  • Score vs commission — at RM 0: 1.15;
-    at RM 35 actual: 1.03;
-    at RM 100: 0.81
+  • Score vs threshold (0.35–0.70): range 0.03–0.12
+  • Score vs commission — at RM 0: 0.05;
+    at RM 35 actual: 0.05;
+    at RM 100: 0.05
   • Strategy remains profitable across the full commission sensitivity range.
 
 WHAT WOULD FURTHER IMPROVE IT:

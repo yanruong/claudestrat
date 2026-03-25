@@ -1,21 +1,21 @@
 {
   "best_params": {
-    "num_leaves": 101,
-    "max_depth": 5,
-    "learning_rate": 0.037017039861413845,
-    "n_estimators": 127,
-    "min_child_samples": 82,
-    "subsample": 0.5372753218398854,
-    "colsample_bytree": 0.9934434683002586,
-    "reg_alpha": 0.7264803074826727,
-    "reg_lambda": 0.0009853225172032562
+    "num_leaves": 23,
+    "max_depth": 7,
+    "learning_rate": 0.04655142126275931,
+    "n_estimators": 420,
+    "min_child_samples": 44,
+    "subsample": 0.6827326611619814,
+    "colsample_bytree": 0.7281174414594245,
+    "reg_alpha": 0.0009177043020423818,
+    "reg_lambda": 0.05330469660177668
   },
-  "best_optuna_score": 3.2928781353013474,
-  "oof_accuracy": 0.5675551470588235,
-  "oof_auc": 0.5846937189054725,
-  "oof_logloss": 0.6821482174598463,
-  "oof_score": 3.2928781353013474,
-  "oof_max_drawdown_rm": 3600.7483335968514,
-  "oof_final_equity_rm": 329852.677685937,
-  "oof_years": 8.634920634920634
+  "best_optuna_score": 0.0512903320184555,
+  "oof_accuracy": 0.4868965517241379,
+  "oof_auc": 0.4725194914623334,
+  "oof_logloss": 0.699885279431856,
+  "oof_score": 0.0512903320184555,
+  "oof_max_drawdown_rm": 3260.843731432034,
+  "oof_final_equity_rm": 4984.999999999905,
+  "oof_years": 8.630952380952381
 }
