@@ -81,6 +81,9 @@ daily['vol_ratio_22_66'] = rvol_22d / rvol_66d
 daily['mom_z_5']  = daily['ret_1d'].rolling(5).sum() / (rvol_22d / np.sqrt(252) * np.sqrt(5)  + 1e-9)
 daily['price_z_66'] = (daily['close'] - daily['close'].rolling(66).mean()) / (daily['close'].rolling(66).std() + 1e-9)
 
+# Open-to-close return — actual tradeable return when entering at open
+daily['ret_oc'] = np.log(daily['close']) - np.log(daily['open'])
+
 # Calendar
 daily['month']   = daily.index.month
 daily['dow']     = daily.index.dayofweek
@@ -163,10 +166,13 @@ for col in sbo_numeric:
 for col in calendar:
     feat[col] = daily[col].shift(1)
 
-# Transaction cost threshold
-tc = np.log(1 + 35 / (daily['close'].mean() * 25))
-feat['fwd_ret_1d'] = daily['ret_1d']
-feat['target']     = (daily['ret_1d'] > tc).astype(int)
+# Per-day transaction cost threshold (today's close ≈ tomorrow's open, avoids look-ahead)
+tc_series = np.log(1 + 35 / (daily['close'] * 25))
+# fwd_ret: next day's open-to-close return (enter at tomorrow open, exit tomorrow close)
+feat['fwd_ret_1d'] = daily['ret_oc'].shift(-1)
+feat['target']     = (feat['fwd_ret_1d'] > tc_series).astype(int)
+# next_open: actual entry price for P&L calculation
+feat['next_open']  = daily['open'].shift(-1)
 
 n_before = len(feat)
 feat = feat.dropna()
@@ -223,7 +229,7 @@ print(f"\nTarget balance: Long={vc.get(1,0)} ({vc.get(1,0)/len(feat)*100:.1f}%) 
       f"Flat={vc.get(0,0)} ({vc.get(0,0)/len(feat)*100:.1f}%)")
 
 # ── 9. Save ───────────────────────────────────────────────────────────────────
-cols_save = final_features + ['fwd_ret_1d', 'target']
+cols_save = final_features + ['fwd_ret_1d', 'target', 'next_open']
 feat_out  = feat[cols_save].replace([np.inf, -np.inf], np.nan).dropna()
 feat_out.to_csv('/home/user/claudestrat/data/features_v2.csv')
 
@@ -231,7 +237,8 @@ meta_v2 = {
     'feature_cols':   final_features,
     'target_col':     'target',
     'fwd_ret_col':    'fwd_ret_1d',
-    'transaction_cost_pct': float(tc),
+    'next_open_col':  'next_open',
+    'transaction_cost_pct': float(tc_series.mean()),
     'n_rows':         len(feat_out),
     'date_range':     [str(feat_out.index[0].date()), str(feat_out.index[-1].date())],
     'external_data':  ['MYR/USD', 'SBO (CBOT ZL)'],

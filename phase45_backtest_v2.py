@@ -27,12 +27,12 @@ os.makedirs(OUT, exist_ok=True)
 INITIAL_CAPITAL = 8_000
 CONTRACT_SIZE   = 25       # MT per lot
 COMMISSION_RT   = 35       # RM round-trip
-PRICE_APPROX    = 4_000    # MYR/MT (static; used for PnL scaling)
 RISK_FREE_DAILY = 0.03 / 252  # ~3% p.a.
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 oof_df = pd.read_csv('/home/user/claudestrat/data/oof_signals.csv', parse_dates=['date'])
 oof_df = oof_df.sort_values('date').reset_index(drop=True)
+open_prices_arr = oof_df['next_open'].values
 
 meta     = json.load(open('/home/user/claudestrat/data/feature_meta_v2.json'))
 results3 = json.load(open('/home/user/claudestrat/data/phase3_v2_results.json'))
@@ -48,12 +48,12 @@ print(f"OOF signals: {len(oof_df)} days  |  {oof_df['date'].iloc[0].date()} → 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Phase 4 — Custom Score metric (formalised)
 # ═══════════════════════════════════════════════════════════════════════════════
-def simulate_backtest(signals, fwd_rets, initial_capital=INITIAL_CAPITAL,
+def simulate_backtest(signals, fwd_rets, open_prices, initial_capital=INITIAL_CAPITAL,
                       contract_size=CONTRACT_SIZE, commission=COMMISSION_RT,
-                      price_approx=PRICE_APPROX, min_margin=5_000):
+                      min_margin=5_000):
     """
-    Long-only strategy: enter long when signal=1, flat when signal=0.
-    1 lot at a time, commission charged on every trade (change of position).
+    Long-only strategy: enter at next-day open, exit at next-day close.
+    open_prices: actual FCPO open price per bar (MYR/MT) — no static approximation.
     Returns: equity array (length = len(signals)+1), trade_log list
     """
     equity = np.empty(len(signals) + 1)
@@ -61,10 +61,10 @@ def simulate_backtest(signals, fwd_rets, initial_capital=INITIAL_CAPITAL,
     prev_pos = 0
     trade_log = []
 
-    for i, (sig, ret) in enumerate(zip(signals, fwd_rets)):
+    for i, (sig, ret, op) in enumerate(zip(signals, fwd_rets, open_prices)):
         cap  = equity[i]
         lots = 1 if (sig == 1 and cap >= min_margin) else 0
-        pnl  = lots * contract_size * price_approx * (np.exp(ret) - 1)
+        pnl  = lots * contract_size * op * (np.exp(ret) - 1)
         txn  = commission if lots != prev_pos else 0
         equity[i+1] = cap + pnl - txn
         if lots != prev_pos:
@@ -72,7 +72,7 @@ def simulate_backtest(signals, fwd_rets, initial_capital=INITIAL_CAPITAL,
         prev_pos = lots
 
     if prev_pos > 0:
-        equity[-1] -= commission   # close final position
+        equity[-1] -= commission
 
     return equity, trade_log
 
@@ -124,12 +124,12 @@ def compute_metrics(equity, trade_log, fwd_rets, signals):
 signals  = oof_df['signal'].values
 fwd_rets = oof_df['fwd_ret'].values
 
-eq_strat, trade_log = simulate_backtest(signals, fwd_rets)
+eq_strat, trade_log = simulate_backtest(signals, fwd_rets, open_prices_arr)
 metrics_strat = compute_metrics(eq_strat, trade_log, fwd_rets, signals)
 
 # ── Buy-and-hold (always long 1 lot) ─────────────────────────────────────────
 bh_signals = np.ones(len(signals), dtype=int)
-eq_bh, trade_log_bh = simulate_backtest(bh_signals, fwd_rets, min_margin=0)
+eq_bh, trade_log_bh = simulate_backtest(bh_signals, fwd_rets, open_prices_arr, min_margin=0)
 metrics_bh = compute_metrics(eq_bh, trade_log_bh, fwd_rets, bh_signals)
 
 print("\n" + "="*60)
@@ -186,7 +186,7 @@ thresholds = np.arange(0.35, 0.70, 0.025)
 thresh_results = []
 for t in thresholds:
     sigs = (oof_df['prob_long'] > t).astype(int).values
-    eq, tl = simulate_backtest(sigs, fwd_rets)
+    eq, tl = simulate_backtest(sigs, fwd_rets, open_prices_arr)
     m = compute_metrics(eq, tl, fwd_rets, sigs)
     thresh_results.append({'threshold': t, **m})
 thresh_df = pd.DataFrame(thresh_results)
@@ -197,7 +197,7 @@ print(thresh_df[['threshold', 'score', 'total_return_pct', 'max_dd_pct', 'sharpe
 commissions = [0, 15, 25, 35, 50, 75, 100]
 comm_results = []
 for c in commissions:
-    eq, tl = simulate_backtest(signals, fwd_rets, commission=c)
+    eq, tl = simulate_backtest(signals, fwd_rets, open_prices_arr, commission=c)
     m = compute_metrics(eq, tl, fwd_rets, signals)
     comm_results.append({'commission_rm': c, **m})
 comm_df = pd.DataFrame(comm_results)
@@ -208,7 +208,7 @@ print(comm_df[['commission_rm', 'score', 'total_return_pct', 'max_dd_pct']].to_s
 capitals = [5000, 8000, 10000, 15000, 20000]
 cap_results = []
 for ic in capitals:
-    eq, tl = simulate_backtest(signals, fwd_rets, initial_capital=ic, min_margin=ic*0.6)
+    eq, tl = simulate_backtest(signals, fwd_rets, open_prices_arr, initial_capital=ic, min_margin=ic*0.6)
     m = compute_metrics(eq, tl, fwd_rets, signals)
     cap_results.append({'initial_capital_rm': ic, **m})
 cap_df = pd.DataFrame(cap_results)

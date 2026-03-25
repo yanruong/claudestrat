@@ -48,6 +48,8 @@ df = df.sort_index()
 X = df[feat_cols].copy()
 y = df[target_col].copy()
 fwd_ret = df[fwd_ret_col].copy()
+next_open = df[meta['next_open_col']].copy()
+next_open_vals = next_open.values
 
 print(f"Dataset: {len(df)} rows × {len(feat_cols)} features")
 print(f"Date range: {df.index[0].date()} → {df.index[-1].date()}")
@@ -87,29 +89,27 @@ for i, (tr, te) in enumerate(splits):
 # Custom Score metric
 # ═══════════════════════════════════════════════════════════════════════════════
 def compute_equity_curve(signals: np.ndarray, daily_rets: np.ndarray,
+                         open_prices: np.ndarray,
                          initial_capital=INITIAL_CAPITAL,
                          contract_size=CONTRACT_SIZE,
                          commission=COMMISSION_RT):
     """
-    signals: +1 (long) or 0 (flat) per bar
-    daily_rets: log-returns for same bars
+    signals:     +1 (long) or 0 (flat) per bar
+    daily_rets:  open-to-close log-returns (enter at open, exit at close)
+    open_prices: actual FCPO open price per bar (MYR/MT) for P&L calculation
     Returns equity curve array.
     """
     equity = np.empty(len(signals) + 1)
     equity[0] = initial_capital
     prev_signal = 0
-    for i, (sig, ret) in enumerate(zip(signals, daily_rets)):
+    for i, (sig, ret, op) in enumerate(zip(signals, daily_rets, open_prices)):
         cap = equity[i]
-        # Determine lot size (floor to 1 lot max, stay flat if < margin)
         lots = 1 if (sig == 1 and cap >= 5_000) else 0
-        # P&L from price move (close-to-close)
-        price_approx = 4000  # MYR/MT static approximation; good enough for Score
-        pnl = lots * contract_size * price_approx * (np.exp(ret) - 1)
-        # Commission on trade (only when signal changes)
+        # P&L using actual entry price (no static approximation)
+        pnl = lots * contract_size * op * (np.exp(ret) - 1)
         txn_cost = commission if lots != prev_signal else 0
         equity[i+1] = cap + pnl - txn_cost
         prev_signal = lots
-    # Close any open position
     if prev_signal > 0:
         equity[-1] -= commission
     return equity
@@ -161,14 +161,19 @@ def objective(trial):
         X_te        = X_vals[te_idx]
         r_te        = fwd_vals[te_idx]
 
-        # Fold-level normalisation (fit scaler on train, apply to test)
+        # Use last 20% of training as internal val for early stopping (no test leakage)
+        val_size = max(int(len(tr_idx) * 0.2), 30)
+        tr_fit_idx = tr_idx[:-val_size]
+        tr_val_idx = tr_idx[-val_size:]
+
         scaler = StandardScaler()
-        X_tr_s = scaler.fit_transform(X_tr)
-        X_te_s = scaler.transform(X_te)
+        X_tr_fit_s = scaler.fit_transform(X_vals[tr_fit_idx])
+        X_tr_val_s = scaler.transform(X_vals[tr_val_idx])
+        X_te_s     = scaler.transform(X_te)
 
         model = lgb.LGBMClassifier(**params)
-        model.fit(X_tr_s, y_tr,
-                  eval_set=[(X_te_s, y_vals[te_idx])],
+        model.fit(X_tr_fit_s, y_vals[tr_fit_idx],
+                  eval_set=[(X_tr_val_s, y_vals[tr_val_idx])],
                   callbacks=[lgb.early_stopping(30, verbose=False),
                               lgb.log_evaluation(-1)])
 
@@ -182,7 +187,9 @@ def objective(trial):
     # Concatenate OOF and compute Score
     signals_all  = np.concatenate(oof_signals)
     fwd_rets_all = np.concatenate(oof_fwd_rets)
-    equity = compute_equity_curve(signals_all, fwd_rets_all)
+    # Gather open prices for OOF rows in same order
+    op_all = np.concatenate([next_open_vals[te_idx] for _, te_idx in splits[:len(oof_signals)]])
+    equity = compute_equity_curve(signals_all, fwd_rets_all, op_all)
     years  = total_days / 252
     score  = custom_score(equity, years)
     return score
@@ -227,13 +234,18 @@ for fold_i, (tr_idx, te_idx) in enumerate(splits):
     X_tr, y_tr = X_vals[tr_idx], y_vals[tr_idx]
     X_te, y_te = X_vals[te_idx], y_vals[te_idx]
 
+    val_size = max(int(len(tr_idx) * 0.2), 30)
+    tr_fit_idx = tr_idx[:-val_size]
+    tr_val_idx = tr_idx[-val_size:]
+
     scaler = StandardScaler()
-    X_tr_s = scaler.fit_transform(X_tr)
-    X_te_s = scaler.transform(X_te)
+    X_tr_fit_s = scaler.fit_transform(X_vals[tr_fit_idx])
+    X_tr_val_s = scaler.transform(X_vals[tr_val_idx])
+    X_te_s     = scaler.transform(X_te)
 
     model = lgb.LGBMClassifier(**final_params)
-    model.fit(X_tr_s, y_tr,
-              eval_set=[(X_te_s, y_te)],
+    model.fit(X_tr_fit_s, y_vals[tr_fit_idx],
+              eval_set=[(X_tr_val_s, y_vals[tr_val_idx])],
               callbacks=[lgb.early_stopping(30, verbose=False),
                           lgb.log_evaluation(-1)])
 
@@ -268,7 +280,8 @@ print(f"\nOOF Overall: Acc={oof_acc:.4f}  AUC={oof_auc:.4f}  LogLoss={oof_ll:.4f
 te_idx_all = np.where(mask)[0]
 sig_all    = oof_signals[te_idx_all]
 ret_all    = fwd_vals[te_idx_all]
-equity_all = compute_equity_curve(sig_all, ret_all)
+op_all_final = next_open_vals[te_idx_all]
+equity_all = compute_equity_curve(sig_all, ret_all, op_all_final)
 years_all  = mask.sum() / 252
 oof_score  = custom_score(equity_all, years_all)
 oof_md     = max_drawdown(equity_all)
@@ -308,6 +321,7 @@ oof_df = pd.DataFrame({
     'signal':    sig_all,
     'prob_long': oof_probs[te_idx_all],
     'equity':    equity_all[1:],
+    'next_open': next_open_vals[te_idx_all],
 })
 oof_df.to_csv('/home/user/claudestrat/data/oof_signals.csv', index=False)
 print("\nSaved model, results, OOF signals.")
