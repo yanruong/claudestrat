@@ -1,0 +1,60 @@
+{
+  "feature_cols": [
+    "morning_gap",
+    "morning_hl",
+    "morning_gap_ret",
+    "ret_1d",
+    "ret_3d",
+    "ret_10d",
+    "price_z_66",
+    "mom_z_5",
+    "sbo_ret_1d",
+    "sbo_ret_5d",
+    "sbo_z_22",
+    "myr_ret_1d",
+    "myr_z_22",
+    "month",
+    "dow",
+    "qtr",
+    "harvest"
+  ],
+  "target_col": "target",
+  "fwd_ret_col": "ret_afeve",
+  "entry_price_col": "afternoon_open",
+  "transaction_cost_rm": 35,
+  "contract_size_mt": 25,
+  "entry_time": "15:00",
+  "exit_time": "23:30",
+  "n_rows": 668,
+  "date_range": [
+    "2022-04-13",
+    "2025-12-16"
+  ],
+  "intraday_features": [
+    "morning_gap",
+    "morning_hl",
+    "morning_gap_ret"
+  ],
+  "prev_day_fcpo": [
+    "ret_1d",
+    "ret_3d",
+    "ret_10d",
+    "price_z_66",
+    "mom_z_5"
+  ],
+  "sbo_features": [
+    "sbo_ret_1d",
+    "sbo_ret_5d",
+    "sbo_z_22"
+  ],
+  "myr_features": [
+    "myr_ret_1d",
+    "myr_z_22"
+  ],
+  "calendar_features": [
+    "month",
+    "dow",
+    "qtr",
+    "harvest"
+  ]
+}

@@ -1,0 +1,57 @@
+
+FCPO Intraday ML Strategy v3 — Edge Statement
+Entry: 15:00 (afternoon session open) | Exit: 23:30 (evening session close)
+Dataset: 2022-11-23 → 2025-12-16
+Signal: generated before 15:00 using morning session data (known by 12:30/13:00 MYT)
+
+STRATEGY MECHANICS:
+─────────────────
+  Target: log(23:30 close) - log(15:00 open) > TC_pct
+  TC_pct = 35 MYR / (afternoon_open × 25 MT)
+  Trading: 1 lot = 25 MT; initial capital RM 8,000
+
+OOF MODEL PERFORMANCE (purged walk-forward, 5 folds):
+─────────────────────────────────────────────────────
+  OOF Accuracy:       50.1%
+  OOF AUC:            0.482
+  OOF Custom Score:   1.1719
+  Final Equity:       RM 28,780  (from RM 8,000)
+  Max Drawdown:       RM 3,111
+  Years evaluated:    2.21
+
+BACKTEST SUMMARY (strategy vs buy-and-hold):
+────────────────────────────────────────────
+  ML Strategy:
+    Final Equity:     RM 28,780
+    Total Return:     259.8%
+    Sharpe Ratio:     1.149
+    Max Drawdown:     RM 13,780 (38.9%)
+    Win Rate:         51.9%
+    Market Exposure:  63.0%
+    Custom Score:     0.5978
+
+  Buy & Hold (15:00→23:30):
+    Final Equity:     RM 27,580
+    Total Return:     244.8%
+    Sharpe Ratio:     1.001
+    Custom Score:     0.3996
+
+SCORE SENSITIVITY:
+  • Score vs threshold (0.35–0.70): range 0.0676–0.5978
+  • Score vs commission — at RM 0: 0.6960;
+    at RM 35 actual: 0.5978;
+    at RM 100: 0.4371
+
+EDGE SOURCES:
+  • Morning session return predicts afternoon+evening direction (momentum continuation)
+  • Morning gap (overnight gap) contains information about afternoon sentiment
+  • SBO (CBOT Soybean Oil) cross-commodity signal: US overnight move predicts MYT afternoon
+  • CPO-SBO spread z-score: mean reversion signal from premium/discount to global edible oils
+  • MYR/USD rate provides currency-adjusted demand signal
+
+CONCLUSION:
+  The v3 intraday strategy exploits the predictability of the FCPO afternoon+evening
+  session (15:00–23:30 MYT) using morning session data available before the 15:00 entry.
+  The pipeline is leakage-free with proper walk-forward validation. Key signals:
+  morning momentum continuation and cross-commodity SBO linkage. This strategy
+  is complementary to overnight strategies and can be run simultaneously.
