@@ -1,0 +1,21 @@
+{
+  "best_params": {
+    "num_leaves": 103,
+    "max_depth": 11,
+    "learning_rate": 0.0829545916098728,
+    "n_estimators": 76,
+    "min_child_samples": 92,
+    "subsample": 0.9655862429532004,
+    "colsample_bytree": 0.5455340743816439,
+    "reg_alpha": 0.0011147897202332545,
+    "reg_lambda": 8.723107372809627
+  },
+  "best_optuna_score": 0.04384856060075516,
+  "oof_accuracy": 0.5128676470588235,
+  "oof_auc": 0.5146317495403417,
+  "oof_logloss": 0.6924359602287483,
+  "oof_score": 0.04384856060075516,
+  "oof_max_drawdown_rm": 4862.9979632861605,
+  "oof_final_equity_rm": 4870.302007318978,
+  "oof_years": 8.634920634920634
+}
